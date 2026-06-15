@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tasks</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; }
+        input, button { padding: 0.5rem; margin: 0.2rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+        .done { background: #d4edda; }
+    </style>
+</head>
+<body>
+    <h1>Gerenciador de Tarefas</h1>
+    <div>
+        <input type="text" id="title" placeholder="Título da tarefa">
+        <label><input type="checkbox" id="done"> Concluída</label>
+        <button onclick="createTask()">Criar</button>
+    </div>
+    <table id="tasks">
+        <thead><tr><th>ID</th><th>Título</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        async function loadTasks() {
+            const res = await fetch('/tasks');
+            const tasks = await res.json();
+            const tbody = document.querySelector('#tasks tbody');
+            tbody.innerHTML = tasks.map(task => `
+                <tr>
+                    <td>${task.id}</td>
+                    <td>${task.title}</td>
+                    <td>${task.done ? '✔ Concluída' : '⏳ Pendente'}</td>
+                    <td>
+                        <button onclick="deleteTask(${task.id})">Excluir</button>
+                        <button onclick="editTask(${task.id})">Editar</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function createTask() {
+            const title = document.getElementById('title').value;
+            const done = document.getElementById('done').checked;
+            await fetch('/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, done })
+            });
+            document.getElementById('title').value = '';
+            document.getElementById('done').checked = false;
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            if (confirm('Excluir tarefa?')) {
+                await fetch(`/tasks/${id}`, { method: 'DELETE' });
+                loadTasks();
+            }
+        }
+
+        async function editTask(id) {
+            // Primeiro, busca os dados atuais da tarefa
+            const res = await fetch(`/tasks/${id}`);
+            const task = await res.json();
+            
+            const newTitle = prompt('Editar título:', task.title);
+            if (newTitle === null || newTitle.trim() === '') {
+                alert('Título não pode ficar vazio.');
+                return;
+            }
+            
+            const newDone = confirm(`Tarefa atualmente: ${task.done ? 'CONCLUÍDA' : 'PENDENTE'}\nClique em OK para marcar como CONCLUÍDA, Cancelar para PENDENTE.`);
+            // newDone = true se OK, false se Cancelar
+            
+            const response = await fetch(`/tasks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle.trim(), done: newDone })
+            });
+            
+            if (response.ok) {
+                loadTasks(); // recarrega a lista
+            } else {
+                const erro = await response.json();
+                alert('Erro ao editar: ' + (erro.error || 'desconhecido'));
+            }
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>
